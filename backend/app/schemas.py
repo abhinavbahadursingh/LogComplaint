@@ -41,8 +41,8 @@ class ComplaintOut(ComplaintBase):
 
     id: int
     status: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime = Field(alias="createdAt")
+    updated_at: datetime = Field(alias="updatedAt")
 
 
 class ChatContext(BaseModel):

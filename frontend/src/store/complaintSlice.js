@@ -11,9 +11,7 @@ const initialForm = {
   quantityAffected: '',
   complaintType: '',
   complaintDate: '',
-  description: '',
-  severity: '',
-  priority: ''
+  description: ''
 }
 
 export const saveComplaint = createAsyncThunk(
@@ -26,6 +24,19 @@ export const saveComplaint = createAsyncThunk(
         body: JSON.stringify(payload)
       })
       if (!res.ok) throw new Error(`Failed to save: ${res.status}`)
+      return await res.json()
+    } catch (err) {
+      return rejectWithValue(err.message)
+    }
+  }
+)
+
+export const fetchComplaints = createAsyncThunk(
+  'complaint/fetchComplaints',
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await fetch('/api/complaints')
+      if (!res.ok) throw new Error(`Failed to load: ${res.status}`)
       return await res.json()
     } catch (err) {
       return rejectWithValue(err.message)
@@ -48,9 +59,7 @@ const aliasMap = {
   quantity_affected: 'quantityAffected',
   complaint_type: 'complaintType',
   complaint_date: 'complaintDate',
-  description: 'description',
-  severity: 'severity',
-  priority: 'priority'
+  description: 'description'
 }
 
 const complaintSlice = createSlice({
@@ -59,7 +68,10 @@ const complaintSlice = createSlice({
     form: initialForm,
     status: 'idle',
     error: null,
-    lastSavedId: null
+    lastSavedId: null,
+    list: [],
+    listStatus: 'idle',
+    listError: null
   },
   reducers: {
     updateField(state, action) {
@@ -68,10 +80,13 @@ const complaintSlice = createSlice({
     },
     bulkUpdate(state, action) {
       const patch = action.payload || {}
-      Object.keys(aliasMap).forEach((key) => {
-        const val = patch[key]
-        if (val !== undefined && val !== null && val !== '') {
-          state.form[aliasMap[key]] = val
+      // Accept both snake_case aliases (FastAPI extractor) and direct camelCase
+      // form keys (Express extractor) so every provided detail reaches the form.
+      Object.entries(patch).forEach(([key, val]) => {
+        if (val === undefined || val === null || val === '') return
+        const formKey = aliasMap[key] || key
+        if (Object.prototype.hasOwnProperty.call(initialForm, formKey)) {
+          state.form[formKey] = val
         }
       })
     },
@@ -98,6 +113,18 @@ const complaintSlice = createSlice({
       .addCase(saveComplaint.rejected, (state, action) => {
         state.status = 'error'
         state.error = action.payload || action.error?.message || 'Save failed'
+      })
+      .addCase(fetchComplaints.pending, (state) => {
+        state.listStatus = 'loading'
+        state.listError = null
+      })
+      .addCase(fetchComplaints.fulfilled, (state, action) => {
+        state.listStatus = 'idle'
+        state.list = action.payload?.complaints ?? []
+      })
+      .addCase(fetchComplaints.rejected, (state, action) => {
+        state.listStatus = 'error'
+        state.listError = action.payload || action.error?.message || 'Failed to load complaints'
       })
   }
 })

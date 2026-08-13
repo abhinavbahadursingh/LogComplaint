@@ -52,6 +52,7 @@ def extract_document(file: UploadFile = File(...)):
     return {"fileName": file.filename, "text": text, "fields": fields}
 
 
+@router.post("/api/chat")
 @router.post("/ai/chat")
 def chat(payload: ChatRequest):
     context = payload.context
@@ -63,7 +64,15 @@ def chat(payload: ChatRequest):
             "context_extracted": context.extracted if context else {},
         }
     )
+    fields = dict(result.get("fields") or {})
+    if result.get("severity"):
+        fields["severity"] = result["severity"]
+    if result.get("priority"):
+        fields["priority"] = result["priority"]
+    if result.get("recommendation"):
+        fields["recommendation"] = result["recommendation"]
+
     return {
         "reply": result.get("reply") or "No response generated.",
-        "extracted": result.get("fields") or {},
+        "extracted": fields,
     }

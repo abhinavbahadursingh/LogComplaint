@@ -19,19 +19,6 @@ const complaintTypes = [
   sentence('Storage / Stability Concern'),
   sentence('Other')
 ]
-const severities = [
-  sentence('Low — Minor cosmetic issue'),
-  sentence('Medium — Moderate, localized impact'),
-  sentence('High — Potential safety / regulatory concern'),
-  sentence('Critical — Immediate recall consideration')
-]
-const priorities = [
-  sentence('Low'),
-  sentence('Normal'),
-  sentence('High'),
-  sentence('Urgent')
-]
-
 function Section({ index, title, children }) {
   return (
     <section className="form-section">
@@ -179,27 +166,14 @@ export default function ComplaintForm() {
               <DateInput name="complaintDate" value={form.complaintDate} onChange={set} />
             </FormField>
           </div>
-          
-        </Section>
-
-        <Section index={4} title="Initial Assessment & Priority">
-          <div className="grid grid--2">
-            <FormField label="Initial Severity" required>
-              <SelectInput
-                name="severity"
-                value={form.severity}
+          <div style={{ marginTop: 14 }}>
+            <FormField label="Description / Details" required>
+              <TextArea
+                name="description"
+                value={form.description}
                 onChange={set}
-                options={severities}
-                placeholder="Assess initial severity"
-              />
-            </FormField>
-            <FormField label="Priority" required>
-              <SelectInput
-                name="priority"
-                value={form.priority}
-                onChange={set}
-                options={priorities}
-                placeholder="Set priority"
+                placeholder="Describe the complaint in detail..."
+                rows={4}
               />
             </FormField>
           </div>

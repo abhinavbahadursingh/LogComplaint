@@ -75,7 +75,7 @@ function UploadZone({ onClose }) {
 
   const validFile = (file) => {
     if (!file) return false
-    const ext = '.' + (file.name.split('.').pop() || '').toLowerCase()
+    const ext = (file.name.split('.').pop() || '').trim().toLowerCase()
     const okExt = ['pdf', 'docx', 'txt', 'eml'].includes(ext)
     const okSize = file.size <= MAX_MB * 1024 * 1024
     if (!okExt) {
@@ -298,7 +298,7 @@ function ExtractProgress() {
 
 export default function AiAssistant() {
   const dispatch = useDispatch()
-  const { chatMessages, chatStatus } = useSelector((s) => s.ai)
+  const { chatMessages, chatStatus, chatError } = useSelector((s) => s.ai)
   const ai = useSelector((s) => s.ai)
   const complaintForm = useSelector((s) => s.complaint?.form)
   const extractedFields = useSelector((s) => s.ai.extractedFields)
@@ -439,7 +439,9 @@ export default function AiAssistant() {
             <span className="avatar avatar--err">
               <AlertIcon />
             </span>
-            <div className="msg-bubble msg-bubble--err">Something went wrong generating a response. Please try again.</div>
+            <div className="msg-bubble msg-bubble--err">
+              {chatError || 'Something went wrong generating a response. Please try again.'}
+            </div>
           </div>
         )}
       </div>
