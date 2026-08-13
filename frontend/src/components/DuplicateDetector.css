@@ -1,0 +1,212 @@
+/* ---------- Duplicate complaint detection ---------- */
+.dup-card {
+  padding: 26px 28px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.dup-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.dup-title-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.dup-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #f472b6 0%, #fb7185 100%);
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 10px 26px -10px rgba(251, 113, 133, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.dup-ico svg {
+  width: 20px;
+  height: 20px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+.dup-title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0;
+  line-height: 1.25;
+  background: linear-gradient(180deg, #ffffff 0%, #c8d2e6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dup-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 4px 0 0;
+}
+
+.dup-regen {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid var(--border-strong);
+  background: rgba(148, 163, 196, 0.05);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  transition: border-color 0.18s var(--ease), background 0.18s var(--ease), color 0.18s var(--ease), transform 0.18s var(--ease);
+}
+
+.dup-regen svg {
+  width: 15px;
+  height: 15px;
+}
+
+.dup-regen:hover:not(:disabled) {
+  border-color: rgba(251, 113, 133, 0.6);
+  background: rgba(251, 113, 133, 0.12);
+  color: #fb7185;
+  transform: translateY(-1px);
+}
+
+.dup-regen:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---------- Banner ---------- */
+.dup-banner {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 14px;
+  border-radius: var(--radius);
+  font-size: 12.5px;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  animation: dup-rise 0.22s var(--ease);
+}
+
+.dup-banner svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.dup-banner--success {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border: 1px solid rgba(79, 209, 138, 0.28);
+}
+
+.dup-banner--info {
+  background: var(--info-bg);
+  color: var(--info-text);
+  border: 1px solid rgba(127, 195, 255, 0.28);
+}
+
+.dup-banner--danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid rgba(255, 125, 138, 0.28);
+}
+
+.dup-banner--warn {
+  background: rgba(251, 191, 36, 0.1);
+  color: #fcd34d;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+@keyframes dup-rise {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- Duplicate list ---------- */
+.dup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dup-item {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  background: rgba(251, 191, 36, 0.06);
+}
+
+.dup-item-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dup-score {
+  font-size: 13px;
+  font-weight: 800;
+  color: #fbbf24;
+  flex-shrink: 0;
+}
+
+.dup-reason {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.dup-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.dup-item-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dup-item-meta span::before {
+  content: '·';
+  color: var(--border-strong);
+}
+
+.dup-item-meta span:first-child::before {
+  content: '';
+}
+
+@media (max-width: 620px) {
+  .dup-card {
+    padding: 20px;
+  }
+
+  .dup-header {
+    flex-direction: column;
+  }
+}

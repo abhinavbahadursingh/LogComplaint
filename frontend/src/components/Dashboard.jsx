@@ -2,24 +2,24 @@ import React, { useEffect, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import ComplaintForm from './ComplaintForm'
 import AiAssistant from './AiAssistant'
-import RiskAssessment from './RiskAssessment'
+import CompletenessChecker from './CompletenessChecker'
+import ComplaintAnalysis from './ComplaintAnalysis'
+import DuplicateDetector from './DuplicateDetector'
+import RootCause from './RootCause'
 import { bulkUpdate } from '../store/complaintSlice'
-import { generateRiskAssessment } from '../store/aiSlice'
 import './Dashboard.css'
 
 export default function Dashboard() {
   const dispatch = useDispatch()
   const { extractStatus, extractedFields } = useSelector((s) => s.ai)
-  const form = useSelector((s) => s.complaint.form)
   const appliedRef = useRef(null)
 
   useEffect(() => {
     if (extractStatus === 'done' && extractedFields && appliedRef.current !== extractedFields) {
       appliedRef.current = extractedFields
       dispatch(bulkUpdate(extractedFields))
-      dispatch(generateRiskAssessment({ form, extracted: extractedFields }))
     }
-  }, [extractStatus, extractedFields, form, dispatch])
+  }, [extractStatus, extractedFields, dispatch])
 
   return (
     <div className="dashboard">
@@ -29,12 +29,15 @@ export default function Dashboard() {
         <span className="ambient-orb ambient-orb--3" />
       </div>
       <main className="columns">
-        <section className="col col--form">
+<section className="col col--form">
           <ComplaintForm />
-          <RiskAssessment />
+          <ComplaintAnalysis />
+          <CompletenessChecker />
         </section>
         <section className="col col--ai">
           <AiAssistant />
+          <RootCause />
+          <DuplicateDetector />
         </section>
       </main>
     </div>

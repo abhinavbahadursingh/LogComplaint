@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef } from 'react'
 import { CalendarIcon, ChevronDownIcon } from '../icons/Icons'
 
 export function FormField({ label, required, hint, children }) {
@@ -59,16 +59,29 @@ export function SelectInput({ name, value, onChange, options, placeholder }) {
 }
 
 export function DateInput({ name, value, onChange }) {
+  const inputRef = useRef(null)
+
+  const openPicker = () => {
+    const el = inputRef.current
+    if (!el) return
+    try {
+      el.showPicker && el.showPicker()
+    } catch {
+      el.focus && el.focus()
+    }
+  }
+
   return (
     <div className="control control--date">
       <input
+        ref={inputRef}
         type="date"
         name={name}
         className="input"
         value={value}
         onChange={(e) => onChange(name, e.target.value)}
       />
-      <span className="affix affix--suffix affix--icon">
+      <span className="affix affix--suffix affix--icon date-picker-trigger" onClick={openPicker} role="button" tabIndex={-1}>
         <CalendarIcon />
       </span>
     </div>

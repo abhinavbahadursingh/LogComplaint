@@ -287,7 +287,18 @@
   background: transparent;
   color: var(--text-muted);
   border: none;
-  pointer-events: none;
+}
+
+.date-picker-trigger {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.date-picker-trigger:hover {
+  color: var(--accent);
 }
 
 .control--date .affix--suffix svg {

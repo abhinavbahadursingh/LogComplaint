@@ -64,6 +64,23 @@ export const generateRiskAssessment = createAsyncThunk(
   }
 )
 
+export const generateAiAnalysis = createAsyncThunk(
+  'ai/generateAiAnalysis',
+  async ({ form, extracted }, { rejectWithValue }) => {
+    try {
+      const res = await fetch('/api/ai/analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { ...form, ...extracted } })
+      })
+      if (!res.ok) throw new Error('AI analysis generation failed')
+      return await res.json()
+    } catch (err) {
+      return rejectWithValue(err.message)
+    }
+  }
+)
+
 const aiSlice = createSlice({
   name: 'ai',
   initialState: {
@@ -81,6 +98,13 @@ const aiSlice = createSlice({
       severity: '',
       nextAction: '',
       assessment: '',
+      error: null
+    },
+    analysis: {
+      status: 'idle', // idle | loading | done | error
+      complaintSummary: '',
+      riskClassification: null,
+      capaRecommendation: null,
       error: null
     }
   },
@@ -161,6 +185,20 @@ const aiSlice = createSlice({
       .addCase(generateRiskAssessment.rejected, (state, action) => {
         state.riskAssessment.status = 'error'
         state.riskAssessment.error = action.payload || 'Risk assessment generation failed.'
+      })
+      .addCase(generateAiAnalysis.pending, (state) => {
+        state.analysis.status = 'loading'
+        state.analysis.error = null
+      })
+      .addCase(generateAiAnalysis.fulfilled, (state, action) => {
+        state.analysis.status = 'done'
+        state.analysis.complaintSummary = action.payload?.complaintSummary || ''
+        state.analysis.riskClassification = action.payload?.riskClassification || null
+        state.analysis.capaRecommendation = action.payload?.capaRecommendation || null
+      })
+      .addCase(generateAiAnalysis.rejected, (state, action) => {
+        state.analysis.status = 'error'
+        state.analysis.error = action.payload || 'AI analysis generation failed.'
       })
   }
 })

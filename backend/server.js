@@ -478,6 +478,373 @@ function assessRisk(fields = {}) {
   return { severity, nextAction, assessment }
 }
 
+/* ---------- AI analysis: complaint summary, risk classification, CAPA ---------- */
+
+const CLASS_LEVELS = {
+  Critical: {
+    label: 'Critical — Immediate recall consideration',
+    score: 95,
+    rationale: 'Potential safety / regulatory concern requiring immediate attention and possible recall evaluation.'
+  },
+  High: {
+    label: 'High — Potential safety / regulatory concern',
+    score: 75,
+    rationale: 'Serious quality deviation with likely product impact; requires batch hold and investigation.'
+  },
+  Medium: {
+    label: 'Medium — Moderate, localized impact',
+    score: 50,
+    rationale: 'Localized quality issue with limited scope; standard complaint investigation recommended.'
+  },
+  Low: {
+    label: 'Low — Minor cosmetic issue',
+    score: 25,
+    rationale: 'Cosmetic / minor defect with no safety implication; monitor and log.'
+  }
+}
+
+function classifyRiskLevel(fields = {}) {
+  const text = [fields.complaintType, fields.description, fields.productName, fields.severity]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+  const stated = (fields.severity || '').toLowerCase()
+  const qty = parseFloat(String(fields.quantityAffected || '').replace(/[^\d.]/g, '')) || 0
+
+  let level = 'Low'
+  if (/critical|recall/i.test(stated) || RISK_CRITICAL.test(text)) level = 'Critical'
+  else if (/high|safety/i.test(stated) || RISK_HIGH.test(text)) level = 'High'
+  else if (/medium|moderate/i.test(stated) || RISK_MEDIUM.test(text)) level = 'Medium'
+  if (qty >= 10 && level === 'Low') level = 'Medium'
+
+  const cfg = CLASS_LEVELS[level]
+  return {
+    level,
+    label: cfg.label,
+    score: cfg.score,
+    rationale: cfg.rationale
+  }
+}
+
+const CAPA_TEMPLATES = {
+  Critical: [
+    'Initiate immediate batch quarantine and a formal recall / field-alert evaluation within 4 hours.',
+    'Open a Critical CAPA; freeze affected inventory and stop further distribution.',
+    'Conduct a containment assessment and notify regulatory bodies as applicable.'
+  ],
+  High: [
+    'Place the batch on quality hold and stop further release of affected stock.',
+    'Open a CAPA with root-cause investigation; review batch records, process controls, and release criteria.',
+    'Implement corrective actions and define effectiveness checks before re-release.'
+  ],
+  Medium: [
+    'Open a complaint investigation and trend the affected batch/product.',
+    'Document disposition decisions (rework, retest, or scrap) based on investigation outcome.',
+    'Update inspection or process controls to prevent recurrence if a pattern emerges.'
+  ],
+  Low: [
+    'Log for monitoring and document the outcome.',
+    'Escalate to corrective action only if the issue repeats or a trend develops.',
+    'No immediate product action required; continue routine quality monitoring.'
+  ]
+}
+
+const CAPA_RCA_TIPS = [
+  'Review manufacturing batch records, in-process controls, and release test results.',
+  'Inspect raw-material lots, equipment settings, and handling/storage conditions.',
+  'Verify labeling, packaging, and change-control history for the affected batch.'
+]
+
+function generateCapaRecommendation(fields = {}, classification = {}) {
+  const level = classification.level || 'Low'
+  const actions = CAPA_TEMPLATES[level] || CAPA_TEMPLATES.Low
+  const narrative = `For a ${level.toLowerCase()}-severity complaint involving ${fields.productName || 'the affected product'}${
+    fields.batchNumber ? ` (batch ${fields.batchNumber})` : ''
+  }, the recommended CAPA approach is: ${actions.map((a) => a.toLowerCase()).join(' ')} During the investigation, ${CAPA_RCA_TIPS.join(
+    ' '
+  )}.`
+  return {
+    level,
+    actions,
+    narrative
+  }
+}
+
+function generateComplaintSummary(fields = {}) {
+  const customer = fields.customerName || 'an unidentified customer'
+  const product = fields.productName || 'the affected product'
+  const batch = fields.batchNumber ? ` (batch ${fields.batchNumber})` : ''
+  const type = fields.complaintType || 'an unspecified complaint'
+  const date = fields.complaintDate ? ` on ${fields.complaintDate}` : ''
+  const qty = fields.quantityAffected ? ` Affected quantity: ${fields.quantityAffected}.` : ''
+  const desc = fields.description ? ` Details: ${fields.description.trim()}` : ''
+  return `Complaint received from ${customer} regarding ${product}${batch}${date}, classified as ${type.toLowerCase()}.${qty}${desc}`
+}
+
+function runAnalysis(fields = {}) {
+  const classification = classifyRiskLevel(fields)
+  return {
+    complaintSummary: generateComplaintSummary(fields),
+    riskClassification: classification,
+    capaRecommendation: generateCapaRecommendation(fields, classification)
+  }
+}
+
+// Fields a complaint record must carry before it is considered complete for
+// QA intake/triage. Mirrors the required fields in the frontend form.
+const REQUIRED_FIELDS = [
+  ['customerName', 'Customer Name'],
+  ['productName', 'Product Name'],
+  ['batchNumber', 'Batch / Lot Number'],
+  ['complaintType', 'Complaint Type'],
+  ['complaintDate', 'Complaint Date'],
+  ['description', 'Description / Details']
+]
+
+const isFilledValue = (v) => v !== undefined && v !== null && String(v).trim() !== ''
+
+function checkCompleteness(fields = {}) {
+  const filled = []
+  const missing = []
+  REQUIRED_FIELDS.forEach(([key, label]) => {
+    ;(isFilledValue(fields[key]) ? filled : missing).push({ key, label })
+  })
+  const requiredCount = REQUIRED_FIELDS.length
+  const filledCount = filled.length
+  return {
+    complete: missing.length === 0,
+    filledCount,
+    requiredCount,
+    score: Math.round((filledCount / requiredCount) * 100),
+    filled,
+    missing
+  }
+}
+
+// Normalize a value for fuzzy matching (lowercase, whitespace collapsed).
+const norm = (v) =>
+  String(v || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+
+// Token overlap ratio between two strings in [0, 1].
+function tokenOverlap(a, b) {
+  const setA = new Set(norm(a).split(/[^a-z0-9]+/).filter(Boolean))
+  const setB = new Set(norm(b).split(/[^a-z0-9]+/).filter(Boolean))
+  if (!setA.size || !setB.size) return 0
+  let common = 0
+  setA.forEach((t) => {
+    if (setB.has(t)) common++
+  })
+  return common / setA.size
+}
+
+// Compare a candidate complaint against an existing logged complaint.
+// Returns a weighted score plus human-readable reasons for the match.
+function matchComplaint(candidate, existing) {
+  let score = 0
+  const reasons = []
+
+  const cBatch = norm(candidate.batchNumber)
+  const eBatch = norm(existing.batchNumber)
+  if (cBatch && eBatch && cBatch === eBatch) {
+    score += 50
+    reasons.push('same batch')
+  }
+
+  const cProd = norm(candidate.productName)
+  const eProd = norm(existing.productName)
+  if (cProd && eProd) {
+    if (cProd === eProd) {
+      score += 30
+      reasons.push('same product')
+    } else if (tokenOverlap(cProd, eProd) >= 0.5) {
+      score += 15
+      reasons.push('similar product')
+    }
+  }
+
+  const cCust = norm(candidate.customerName)
+  const eCust = norm(existing.customerName)
+  if (cCust && eCust) {
+    if (cCust === eCust) {
+      score += 15
+      reasons.push('same customer')
+    } else if (tokenOverlap(cCust, eCust) >= 0.5) {
+      score += 8
+      reasons.push('similar customer')
+    }
+  }
+
+  const cType = norm(candidate.complaintType)
+  const eType = norm(existing.complaintType)
+  if (cType && eType && cType === eType) {
+    score += 10
+    reasons.push('same complaint type')
+  }
+
+  const cDesc = norm(candidate.description)
+  const eDesc = norm(existing.description)
+  if (cDesc && eDesc && tokenOverlap(cDesc, eDesc) >= 0.4) {
+    score += 10
+    reasons.push('similar description')
+  }
+
+  return { score, reasons }
+}
+
+// Find logged complaints that are likely duplicates of the candidate form.
+const DUPLICATE_THRESHOLD = 40
+
+function findDuplicates(fields = {}) {
+  const candidate = fields || {}
+  const results = []
+  complaints.forEach((existing, id) => {
+    const { score, reasons } = matchComplaint(candidate, existing)
+    if (score >= DUPLICATE_THRESHOLD) {
+      results.push({
+        id,
+        score,
+        reason: reasons.join(', '),
+        existing: {
+          customerName: existing.customerName,
+          productName: existing.productName,
+          batchNumber: existing.batchNumber,
+          complaintType: existing.complaintType,
+          complaintDate: existing.complaintDate,
+          createdAt: existing.createdAt,
+          status: existing.status
+        }
+      })
+    }
+  })
+  return results.sort((a, b) => b.score - a.score)
+}
+
+// Root-cause guidance derived from the complaint type/description. Kept
+// separate from the chat branch so the existing copilot behaviour is untouched.
+const ROOT_CAUSE_MAP = {
+  appearance: {
+    likelyCauses: [
+      'Raw material variance',
+      'Process deviation in compression / coating',
+      'Handling or transit damage'
+    ],
+    nextSteps: [
+      'Review batch manufacturing records and the deviation log',
+      'Inspect retained samples from the affected batch',
+      'Investigate handling and storage conditions across the supply chain'
+    ]
+  },
+  packaging: {
+    likelyCauses: [
+      'Packaging material defect',
+      'Seal / lamination failure',
+      'Machinery setup or changeover issue'
+    ],
+    nextSteps: [
+      'Inspect packaging line setup and sealing parameters',
+      'Review incoming QC certificates for packaging material',
+      'Verify line clearance and changeover records'
+    ]
+  },
+  labeling: {
+    likelyCauses: [
+      'Label artwork / print error',
+      'Label changeover mix-up',
+      'Incorrect label setup during packaging'
+    ],
+    nextSteps: [
+      'Verify artwork version and proofing records',
+      'Audit the label changeover procedure',
+      'Review line clearance documentation'
+    ]
+  },
+  contamin: {
+    likelyCauses: [
+      'Contamination during manufacturing',
+      'Environmental / cleanroom control failure',
+      'Raw material contamination'
+    ],
+    nextSteps: [
+      'Review environmental monitoring data',
+      'Check cleaning validation records',
+      'Sample and test the affected batch'
+    ]
+  },
+  strength: {
+    likelyCauses: [
+      'Formulation / batching error',
+      'Incorrect active-ingredient addition',
+      'Mixing or homogeneity issue'
+    ],
+    nextSteps: [
+      'Verify batch formulation and weighing records',
+      'Review mixing and homogenization parameters',
+      'Test assay and content uniformity'
+    ]
+  },
+  microbial: {
+    likelyCauses: [
+      'Microbial contamination',
+      'Sterilization failure',
+      'Moisture ingress during storage'
+    ],
+    nextSteps: [
+      'Run microbial limits testing',
+      'Review sterilization / validation records',
+      'Check packaging integrity and storage conditions'
+    ]
+  },
+  storage: {
+    likelyCauses: [
+      'Temperature / humidity excursion',
+      'Shelf-life expiry',
+      'Inappropriate storage conditions'
+    ],
+    nextSteps: [
+      'Review temperature and humidity monitoring logs',
+      'Verify expiry dating and stability data',
+      'Assess stability study results'
+    ]
+  },
+  default: {
+    likelyCauses: [
+      'Raw material variance',
+      'Process deviation',
+      'Handling or storage conditions'
+    ],
+    nextSteps: [
+      'Open a complaint investigation',
+      'Review batch records and deviation logs',
+      'Initiate CAPA once the root cause is confirmed'
+    ]
+  }
+}
+
+function recommendRootCause(fields = {}) {
+  const text = [fields.complaintType, fields.description, fields.productName]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+  let matched = null
+  for (const [pattern, cfg] of Object.entries(ROOT_CAUSE_MAP)) {
+    if (pattern === 'default') continue
+    if (new RegExp(pattern, 'i').test(text)) {
+      matched = cfg
+      break
+    }
+  }
+  const cfg = matched || ROOT_CAUSE_MAP.default
+  return {
+    product: fields.productName || null,
+    batch: fields.batchNumber || null,
+    likelyCauses: cfg.likelyCauses,
+    nextSteps: cfg.nextSteps
+  }
+}
+
 /* ---------- Routes ---------- */
 
 app.get('/api/health', (_req, res) => {
@@ -510,6 +877,26 @@ app.post('/api/ai/extract', upload.single('file'), (req, res) => {
 app.post('/api/ai/risk-assessment', (req, res) => {
   const fields = req.body?.fields || {}
   res.json(assessRisk(fields))
+})
+
+app.post('/api/ai/completeness', (req, res) => {
+  const form = req.body?.form || req.body?.fields || {}
+  res.json(checkCompleteness(form))
+})
+
+app.post('/api/ai/duplicates', (req, res) => {
+  const fields = req.body?.fields || req.body?.form || {}
+  res.json({ duplicates: findDuplicates(fields), checked: complaints.size })
+})
+
+app.post('/api/ai/root-cause', (req, res) => {
+  const fields = req.body?.fields || req.body?.form || {}
+  res.json(recommendRootCause(fields))
+})
+
+app.post('/api/ai/analysis', (req, res) => {
+  const fields = req.body?.fields || req.body?.form || {}
+  res.json(runAnalysis(fields))
 })
 
 app.post('/api/ai/chat', (req, res) => {
@@ -595,7 +982,13 @@ app.post('/api/ai/chat', (req, res) => {
     return res.json({ reply, extracted: payload })
   }
 
-  if (/summary|summar/.test(msg) || (q && /what|tell/.test(msg))) {
+  const completenessIntent = /complet|missing|checklist|ready to (?:file|submit|save|triage)|what.?s (?:still )?(?:needed|required|missing)|what fields (?:are|do i)/.test(msg)
+  if (completenessIntent && (isQuestion || /^(check|show|list|verify|review|validate)/.test(msg.trim()))) {
+    const c = checkCompleteness(latest)
+    reply = c.complete
+      ? `The complaint record is complete — all ${c.requiredCount} required fields are filled (${c.score}%). You can save it to begin triage.`
+      : `The complaint record is incomplete — ${c.filledCount}/${c.requiredCount} required fields filled (${c.score}%). Still missing: ${c.missing.map((m) => m.label).join(', ')}.`
+  } else if (/summary|summar/.test(msg) || (q && /what|tell/.test(msg))) {
     reply = `Summary of this complaint: customer "${customer || 'Unknown'}", product "${mention || 'Unknown'}"${batch ? `, batch ${batch}` : ''}. Severity: ${severity || 'not set'}. Next step is to confirm the details on the left and save to begin triage.`
   } else if (/severity|urgent|priority|triag/.test(msg)) {
     const fast = /urgent|critical|high/i.test(priority || '') || /high|crit/i.test(severity || '') || /urgen/i.test(severity || '')
