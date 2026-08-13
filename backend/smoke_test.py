@@ -73,7 +73,63 @@ eb = r.json()
 print("fileName:", eb.get("fileName"))
 print("fields:", eb.get("fields"))
 
-print("\n== 5. POST /api/complaints (camelCase) ==")
+print("\n== 5. POST /api/ai/extract — PDF upload -> LLM extraction -> form fields ==")
+
+
+def make_pdf(path, lines):
+    content = b" ".join(f"({line}) Tj".encode("latin-1") for line in lines)
+    stream = b"BT /F1 12 Tf 72 720 Td " + content + b" ET"
+    objs = [
+        b"1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n",
+        b"2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n",
+        b"3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+        b"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj\n",
+        b"4 0 obj << /Length " + str(len(stream)).encode() + b" >> stream\n"
+        + stream + b"\nendstream endobj\n",
+        b"5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n",
+    ]
+    out = b"%PDF-1.4\n"
+    offsets = [0]
+    for obj in objs:
+        offsets.append(len(out))
+        out += obj
+    xref_pos = len(out)
+    xref = b"xref\n0 6\n" + b"0000000000 65535 f \n"
+    for i in range(1, 6):
+        xref += b"%010d 00000 n \n" % offsets[i]
+    out += xref
+    out += b"trailer << /Size 6 /Root 1 0 R >>\nstartxref\n" + str(xref_pos).encode() + b"\n%%EOF"
+    with open(path, "wb") as fh:
+        fh.write(out)
+
+
+make_pdf(
+    "test_complaint.pdf",
+    [
+        "Customer: Acme Pharmaceuticals",
+        "Product: Paracetamol 500mg Tablets",
+        "Batch/Lot Number: B24XR-0087",
+        "Strength: 500 mg / USP Grade",
+        "Quantity: 6",
+        "Manufacturing Date: 12/04/2026",
+        "Expiry Date: 11/04/2028",
+        "Complaint Date: 08/08/2026",
+        "Complaint Type: Packaging Issue",
+        "Severity: Medium",
+        "Two tablets inside the blister were found cracked on opening the pack.",
+        "Packaging shows signs of moisture ingress.",
+        "(email) reported by the regional distributor.",
+    ],
+)
+with open("test_complaint.pdf", "rb") as fh:
+    r = client.post("/api/ai/extract", files={"file": ("test_complaint.pdf", fh.read(), "application/pdf")})
+print(r.status_code)
+pdf_fields = r.json().get("fields", {})
+for k in ("customer_name", "product_name", "batch_number", "complaint_type", "severity"):
+    print(f"  {k}: {pdf_fields.get(k)}")
+assert pdf_fields.get("batch_number") == "B24XR-0087"
+
+print("\n== 6. POST /api/complaints (camelCase) ==")
 r = client.post(
     "/api/complaints",
     json={

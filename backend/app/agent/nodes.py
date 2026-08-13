@@ -392,9 +392,9 @@ def compose_node(state: AgentState) -> AgentState:
             f"I processed that as a new complaint and extracted the following details: "
             f"{summary}."
         )
-    if severity:
-        reply += f" Initial severity: {severity}."
-    if priority:
-        reply += f" Priority: {priority}."
-    reply += " Review the form on the left, then save to begin triage."
+        if severity:
+            reply += f" Initial severity: {severity}."
+        if priority:
+            reply += f" Priority: {priority}."
+        reply += " Review the form on the left, then save to begin triage."
     return {"reply": reply}

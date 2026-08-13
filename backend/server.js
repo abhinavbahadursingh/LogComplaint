@@ -49,6 +49,11 @@ function extractFields(text) {
   grab(/exp(?:ir)?y?\s*date\s*[:=\-]\s*(\d{2}[\/.-]\d{2}[\/.-]\d{2,4})/i, 'expiryDate')
   grab(/complaint\s*(?:date)?\s*[:=\-]\s*(\d{2}[\/.-]\d{2}[\/.-]\d{2,4})/i, 'complaintDate')
 
+  const defect = t.match(
+    /(?:found|observed|noticed|reported|complaint|issue|problem)[^\n]{2,200}|[^\n]*(?:cracked|broken|moisture|discolor|discolou?r|contamin|foreign|leak|odor|odour|smell|deformed|split|spill)[^\n]*/i
+  )
+  if (defect) fields.description = defect[0].trim()
+
   if (/severity\s*[:=\-]\s*(\w+)/i.test(t)) {
     const level = RegExp.$1.toLowerCase()
     fields.severity = /crit|high/.test(level)
@@ -119,6 +124,66 @@ function extractTextFromFile(file) {
   ].join('\n')
 }
 
+/* ---------- Heuristic risk assessment ---------- */
+
+const RISK_CRITICAL = /contamin|microbial|foreign|recall|safety|life.?threat|allerg|child|infant|steril|leak|burst|tamper|poison|toxic|blood/
+const RISK_HIGH = /cracked|crack|moisture|dosage|strength|potenc|wrong|mislabel|labeling|missing|broken|split|discolor|discolou?r|color change|smell|odor|odour|deform|spill/
+const RISK_MEDIUM = /packaging|appearance|cosmetic|visual|dented|scratch|residue|sticky|seal|container/
+
+const RISK_ACTIONS = {
+  'Critical — Immediate recall consideration':
+    'Quarantine all affected batch inventory immediately, initiate CAPA, and evaluate regulatory notification (recall / field alert) within 4 hours.',
+  'High — Potential safety / regulatory concern':
+    'Place the batch on quality hold, open a CAPA, and run a root-cause investigation before releasing any further stock.',
+  'Medium — Moderate, localized impact':
+    'Open a complaint investigation, trend the batch, and disposition based on the investigation outcome and impact assessment.',
+  'Low — Minor cosmetic issue':
+    'Log for monitoring and document the outcome; escalate to corrective action only if a trend or repeat pattern emerges.'
+}
+
+function assessRisk(fields = {}) {
+  const text = [
+    fields.complaintType,
+    fields.description,
+    fields.productName,
+    fields.severity,
+    fields.priority
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+
+  const stated = (fields.severity || '').toLowerCase()
+  const qty = parseFloat(String(fields.quantityAffected || '').replace(/[^\d.]/g, '')) || 0
+
+  let severity = 'Low — Minor cosmetic issue'
+  if (/critical|recall/i.test(stated) || RISK_CRITICAL.test(text)) {
+    severity = 'Critical — Immediate recall consideration'
+  } else if (/high|safety/i.test(stated) || RISK_HIGH.test(text)) {
+    severity = 'High — Potential safety / regulatory concern'
+  } else if (/medium|moderate/i.test(stated) || RISK_MEDIUM.test(text)) {
+    severity = 'Medium — Moderate, localized impact'
+  }
+
+  if (qty >= 10 && severity === 'Low — Minor cosmetic issue') {
+    severity = 'Medium — Moderate, localized impact'
+  }
+
+  const nextAction = RISK_ACTIONS[severity]
+  const level = severity.split('—')[0].trim().toLowerCase()
+
+  const customer = fields.customerName || 'the reporting customer'
+  const product = fields.productName || 'the affected product'
+  const batch = fields.batchNumber ? ` (batch ${fields.batchNumber})` : ''
+  const type = fields.complaintType ? fields.complaintType.toLowerCase() : 'reported defect'
+
+  const assessment = `Complaint received from ${customer} regarding ${product}${batch}, classified as ${type}. Based on the reported condition, the risk level is assessed as ${level}. Recommended action: ${nextAction}${
+    qty > 0 ? ` Affected quantity on record: ${fields.quantityAffected}.` : ''
+  }`
+
+  return { severity, nextAction, assessment }
+}
+
 /* ---------- Routes ---------- */
 
 app.get('/api/health', (_req, res) => {
@@ -144,6 +209,11 @@ app.post('/api/ai/extract', upload.single('file'), (req, res) => {
   const text = extractTextFromFile(req.file)
   const fields = extractFields(text)
   res.json({ fileName: req.file.originalname, text, fields })
+})
+
+app.post('/api/ai/risk-assessment', (req, res) => {
+  const fields = req.body?.fields || {}
+  res.json(assessRisk(fields))
 })
 
 app.post('/api/ai/chat', (req, res) => {

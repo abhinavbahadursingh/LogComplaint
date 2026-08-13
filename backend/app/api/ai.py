@@ -1,9 +1,13 @@
+import logging
+
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from .. import config
 from ..agent.graph import agent_graph
 from ..schemas import ChatRequest
 from ..services.text_extract import extract_text_from_bytes
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -17,8 +21,17 @@ def extract_document(file: UploadFile = File(...)):
         text = extract_text_from_bytes(data, file.filename or "")
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Text extraction failed for %s: %s", file.filename, exc)
+        raise HTTPException(
+            status_code=400,
+            detail="Could not read text from the document. It may be corrupt or encrypted.",
+        ) from exc
     if not text.strip():
-        raise HTTPException(status_code=400, detail="No readable text found in the document.")
+        raise HTTPException(
+            status_code=400,
+            detail="No readable text found in the document. Scanned or image-only PDFs are not supported yet.",
+        )
 
     result = agent_graph.invoke(
         {
