@@ -1,0 +1,127 @@
+:root {
+  /* Palette — deep enterprise dark */
+  color-scheme: dark;
+
+  --bg: #070b15;
+  --bg-soft: #0b1120;
+  --glass: rgba(255, 255, 255, 0.035);
+  --glass-strong: rgba(255, 255, 255, 0.055);
+  --glass-hover: rgba(255, 255, 255, 0.085);
+  --card-bg: rgba(15, 21, 38, 0.62);
+  --input-bg: rgba(6, 10, 20, 0.55);
+  --border: rgba(148, 163, 196, 0.14);
+  --border-strong: rgba(148, 163, 196, 0.26);
+  --text-primary: #eef2fb;
+  --text-secondary: #9aa7c2;
+  --text-muted: #5f6b86;
+  --accent: #5b8cff;
+  --accent-hover: #4f7ef0;
+  --accent-soft: rgba(91, 140, 255, 0.12);
+  --accent-purple: #8b7bff;
+  --success-bg: rgba(45, 190, 120, 0.12);
+  --success-text: #4fd18a;
+  --info-bg: rgba(90, 170, 255, 0.12);
+  --info-text: #7fc3ff;
+  --danger: #ff7d8a;
+  --danger-bg: rgba(255, 90, 110, 0.12);
+  --warning-bg: #3a2c12;
+
+  /* Geometry */
+  --radius: 10px;
+  --radius-sm: 8px;
+  --radius-lg: 18px;
+  --input-h: 42px;
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 24px 60px -30px rgba(0, 0, 0, 0.7);
+  --shadow-pop: 0 24px 60px -20px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(148, 163, 196, 0.08);
+  --shadow-soft: 0 12px 32px -16px rgba(0, 0, 0, 0.55);
+  --shadow-hover: 0 18px 48px -24px rgba(91, 140, 255, 0.55);
+  --accent-grad: linear-gradient(135deg, #5b8cff 0%, #8b7bff 100%);
+  --accent-grad-soft: linear-gradient(135deg, rgba(91, 140, 255, 0.14) 0%, rgba(139, 123, 255, 0.1) 100%);
+  --accent-soft-2: #1a2747;
+
+  --gap: 16px;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background:
+    radial-gradient(1000px 560px at 12% -8%, rgba(91, 140, 255, 0.12), transparent 62%),
+    radial-gradient(900px 540px at 88% -6%, rgba(139, 123, 255, 0.1), transparent 60%),
+    radial-gradient(1200px 800px at 50% 115%, rgba(46, 88, 184, 0.08), transparent 65%),
+    var(--bg);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+  color: inherit;
+}
+
+select option {
+  background: var(--bg-soft);
+  color: var(--text-primary);
+}
+
+input[type='date'] {
+  color-scheme: dark;
+}
+
+::placeholder {
+  color: var(--text-muted);
+}
+
+::selection {
+  background: rgba(91, 140, 255, 0.32);
+  color: #fff;
+}
+
+:focus-visible {
+  outline: 2px solid rgba(91, 140, 255, 0.6);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 196, 0.18);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 196, 0.32);
+  background-clip: content-box;
+}
